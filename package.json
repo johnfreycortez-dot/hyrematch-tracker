@@ -1,7 +1,7 @@
 {
   "name": "hyrematch-tracker",
   "productName": "HyreMatch Tracker",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Counts active and idle time while you are clocked in at HyreMatch.",
   "author": "HyreMatch Inc.",
   "license": "UNLICENSED",

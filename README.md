@@ -1,4 +1,4 @@
-# HyreMatch Tracker (desktop app), version 2.0.0
+# HyreMatch Tracker (desktop app), version 2.0.1
 
 A small Windows / Mac app for hired talent. While they are clocked in on hyrematch.com (My work), it counts how many
 minutes the computer is in use and how many it is idle, in 10-minute blocks, and sends them to the HyreMatch backend
@@ -27,18 +27,16 @@ minutes the computer is in use and how many it is idle, in 10-minute blocks, and
 4. `npm test` checks the counting rules (no network needed).
 
 ## Make the installers
-Each installer has to be built on its own system.
-- Windows (on a Windows PC): `npm run dist:win` -> `dist/HyreMatch Tracker Setup 1.0.0.exe`
-- Mac (on a Mac): `npm run dist:mac` -> `dist/HyreMatch Tracker-1.0.0.dmg`
-
-Add app icons before building: `build/icon.ico` (Windows) and `build/icon.icns` (Mac). Without them the default
-Electron icon is used.
+GitHub builds them: Actions tab > "Build installers" > Run workflow. It runs the tests, builds the Windows (.exe) and
+Mac (.dmg, Intel + Apple Silicon) installers, starts each app once to make sure it opens, and puts both on a Release.
+Copy the two links into the admin area: Activity > Tracker app links.
 
 ### Signing (so Windows and macOS don't warn people)
 - Windows: without a code-signing certificate, SmartScreen shows "Windows protected your PC" and people click
   "More info" > "Run anyway". A certificate costs money every year.
-- Mac: without an Apple Developer ID (US$99 a year) and notarization, macOS blocks the app; people must right-click >
-  Open. Screenshots on a Mac also need the person to allow Screen Recording in System Settings (the app shows the step).
+- Mac: without an Apple Developer ID (US$99 a year) and notarization, macOS blocks the first open. People open it once
+  from System Settings > Privacy & Security > "Open Anyway" (older macOS: right-click > Open). Screenshots on a Mac
+  also need Screen Recording allowed in System Settings (the app shows the step).
 
 ## Files
 - `main.js`: window, tray icon, sign-in storage, screenshot capture.
@@ -47,5 +45,6 @@ Electron icon is used.
 - `renderer/`: the window (sign in, terms, status).
 
 ## Not done yet
-- Installers are not built or signed (see above).
-- No auto-update: a new version means sending a new installer.
+- The installers are not signed (see above).
+- No auto-update: a new version means sending a new installer link.
+- It does not start by itself when the computer starts: people open it before they clock in.

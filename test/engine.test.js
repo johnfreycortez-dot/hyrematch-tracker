@@ -58,6 +58,32 @@ function setup({ shots = false, screens = 2 } = {}) {
   await e.refresh(); await run(31);
   ok('screen monitoring off: none taken', t.captures === 0 && t.shotFiles === 0);
 
+  // Sign-in rules (2.0.1): being offline never signs anyone out; only the server's "sign in again" does.
+  {
+    const { createApi } = require('../lib/api');
+    let mode = 'offline';
+    const eng = createEngine({ now: () => Date.now(), idleSeconds: () => 0, capture: async () => [], call: async () => {
+      if (mode === 'offline') throw new Error('No connection');
+      if (mode === 'expired') { const er = new Error('Your sign-in expired. Please sign in again.'); er.signIn = true; throw er; }
+      return { ok: true, on: true, consent: true, tracking: false, state: 'Not clocked in' };
+    } });
+    await eng.refresh();
+    ok('offline at start: not signed out', eng.status().authLost === false && eng.status().online === false);
+    mode = 'ok'; await eng.refresh();
+    ok('back online: view loads', !!eng.status().view && eng.status().authLost === false);
+    mode = 'expired'; await eng.refresh();
+    ok('expired sign-in: flagged', eng.status().authLost === true && eng.status().view === null);
+
+    let saved = '', sent = null;
+    const call = createApi({ url: 'https://x.test', getSession: () => 'old', onRenew: v => { saved = v; }, fetchFn: async (_u, o) => { sent = o; return { json: async () => ({ ok: true, renew: 'new-token', on: true }) }; } });
+    const r = await call('track.me', { app: 'tracker' });
+    ok('fresh sign-in from the server is saved', saved === 'new-token' && r.renew === undefined && r.on === true);
+    ok('requests have a time limit', !!(sent && sent.signal));
+    const hang = createApi({ url: 'https://x.test', getSession: () => 's', fetchFn: async () => { throw new Error('aborted'); } });
+    let msg = ''; try { await hang('track.me'); } catch (er) { msg = er.message; }
+    ok('a failed request reads as no connection', /No connection/.test(msg) );
+  }
+
   console.log(fail ? fail + ' FAILED' : 'ALL PASS');
   process.exit(fail ? 1 : 0);
 })();

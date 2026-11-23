@@ -1,28 +1,18 @@
 # Builds the HyreMatch Tracker installers on GitHub's own Windows and Mac machines.
-# Run it from the Actions tab ("Build installers" > Run workflow), or push a tag like v2.0.0.
-# The installers are attached to a GitHub Release; copy their links into Activity > Tracker app links.
+# Run it from the Actions tab ("Build installers" > Run workflow).
+# Each build: runs the tests, builds the app, starts it once to make sure it opens, then puts the installers on a Release.
+# Copy the installer links into Activity > Tracker app links.
 name: Build installers
 
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            cmd: npx electron-builder --win nsis --publish never
-            files: dist/*.exe
-          - os: macos-latest
-            cmd: npx electron-builder --mac dmg --universal --publish never
-            files: dist/*.dmg
-    runs-on: ${{ matrix.os }}
+  windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,24 +20,66 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm test
-      - run: ${{ matrix.cmd }}
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false # not signed yet (no Apple/Windows certificate)
+      - run: npx electron-builder --win nsis --publish never
+      - name: Start the built app once (it must stay open for 20 seconds)
+        shell: bash
+        run: |
+          "dist/win-unpacked/HyreMatch Tracker.exe" &
+          sleep 20
+          tasklist | grep -i "HyreMatch Tracker" || { echo "The app closed by itself"; exit 1; }
+          taskkill //F //IM "HyreMatch Tracker.exe" //T || true
+      - name: Install it silently and check the files are there
+        shell: bash
+        run: |
+          ./dist/HyreMatch-Tracker-*-win.exe //S
+          sleep 25
+          ls "$LOCALAPPDATA/Programs/HyreMatch Tracker/HyreMatch Tracker.exe"
       - uses: actions/upload-artifact@v4
         with:
-          name: installer-${{ matrix.os }}
-          path: ${{ matrix.files }}
+          name: installer-windows
+          path: dist/*.exe
+
+  mac:
+    runs-on: macos-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false # no Apple Developer ID yet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm test
+      - run: npx electron-builder --mac dir --universal --publish never
+      - name: Sign it for this build (ad-hoc), so it can open on Apple Silicon Macs
+        run: |
+          codesign --force --deep --sign - "dist/mac-universal/HyreMatch Tracker.app"
+          codesign --verify --deep --strict --verbose=2 "dist/mac-universal/HyreMatch Tracker.app"
+      - name: Start the built app once (it must stay open for 20 seconds)
+        run: |
+          "dist/mac-universal/HyreMatch Tracker.app/Contents/MacOS/HyreMatch Tracker" &
+          sleep 20
+          pgrep -f "HyreMatch Tracker.app" || { echo "The app closed by itself"; exit 1; }
+          pkill -f "HyreMatch Tracker.app" || true
+      - run: npx electron-builder --mac dmg --universal --prepackaged "dist/mac-universal/HyreMatch Tracker.app" --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-mac
+          path: dist/*.dmg
 
   release:
-    needs: build
+    needs: [windows, mac]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: out
+      - id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Publish the installers on a Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
-          name: HyreMatch Tracker ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          tag_name: v${{ steps.v.outputs.version }}-build${{ github.run_number }}
+          name: HyreMatch Tracker ${{ steps.v.outputs.version }} (build ${{ github.run_number }})
           files: out/**/*

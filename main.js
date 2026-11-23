@@ -5,7 +5,8 @@ const path = require('path');
 const { createEngine, TICK } = require('./lib/engine');
 const { createApi, DEFAULT_URL } = require('./lib/api');
 
-const API_URL = process.env.HYREMATCH_API || DEFAULT_URL; // HYREMATCH_API is for testing only
+// HYREMATCH_API is for testing from the source only. The installed app always talks to hyrematch.com.
+const API_URL = (!app.isPackaged && process.env.HYREMATCH_API) || DEFAULT_URL;
 const SITE = 'https://hyrematch.com/candidate';
 let win = null, tray = null, quitting = false, session = '', email = '';
 
@@ -26,7 +27,7 @@ function saveSession() {
   } catch (e) { /* signed in for this run only */ }
 }
 
-const call = createApi({ url: API_URL, getSession: () => session });
+const call = createApi({ url: API_URL, getSession: () => session, onRenew: next => { session = next; saveSession(); } });
 
 // One JPEG per monitor (up to `max`), each 1280 px wide and kept under about 400 KB.
 // Only called when this person's client uses screen monitoring (see lib/engine.js).
@@ -71,7 +72,8 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => { if (url.startsWith('https://hyrematch.com/')) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', e => e.preventDefault());
-  win.on('close', e => { if (!quitting && engine.status().tracking) { e.preventDefault(); win.hide(); } }); // keeps counting in the tray
+  // Closing the window keeps the app running near the clock (so it is ready when they clock in). Quit is in the tray menu.
+  win.on('close', e => { if (!quitting && (tray || engine.status().tracking)) { e.preventDefault(); win.hide(); } });
 }
 
 function createTray() {
@@ -87,6 +89,9 @@ function createTray() {
     tray.on('click', () => { if (win) { win.show(); win.focus(); } });
   } catch (e) { tray = null; }
 }
+
+// Signs out only when the server says the sign-in is no longer valid. Being offline never signs anyone out.
+function expired() { if (session && engine.status().authLost) { session = ''; saveSession(); engine.signOut(); push(); } }
 
 ipcMain.handle('state', () => state());
 ipcMain.handle('code.send', async (_e, mail) => { await call('code.send', { email: String(mail || '').trim() }); return true; });
@@ -106,15 +111,15 @@ else {
   app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
   app.whenReady().then(async () => {
     loadSession();
-    createWindow();
     createTray();
+    createWindow();
     if (session) await engine.refresh();
-    setInterval(async () => {
-      await engine.tick(); // counts, and checks in with the server every 2 minutes
+    setInterval(() => {
+      engine.tick().catch(() => {}).then(expired); // counts, and checks in with the server every 2 minutes
     }, TICK * 1000);
-    setInterval(() => { if (session) engine.refresh().then(() => { if (engine.status().view === null && session) { /* sign-in expired */ session = ''; saveSession(); push(); } }); }, 60000);
+    setInterval(() => { if (session) engine.refresh().catch(() => {}).then(expired); }, 60000);
     powerMonitor.on('suspend', () => { engine.stop(); });
-    powerMonitor.on('resume', () => { if (session) engine.refresh(); });
+    powerMonitor.on('resume', () => { if (session) engine.refresh().catch(() => {}); });
   });
   app.on('before-quit', e => {
     if (quitting) return;
