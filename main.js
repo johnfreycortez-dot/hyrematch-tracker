@@ -10,6 +10,24 @@ const API_URL = (!app.isPackaged && process.env.HYREMATCH_API) || DEFAULT_URL;
 const SITE = 'https://hyrematch.com/candidate';
 let win = null, tray = null, quitting = false, session = '', email = '';
 
+// Starts with the computer (2.0.2), quietly near the clock, so it is already running when the person clocks in.
+// Installed app only. The person can turn it off in the tray menu; their choice is kept.
+const prefsFile = () => path.join(app.getPath('userData'), 'prefs.json');
+const loadPrefs = () => { try { return JSON.parse(fs.readFileSync(prefsFile(), 'utf8')) || {}; } catch (e) { return {}; } };
+const autoStartOn = () => loadPrefs().autoStart !== false;
+function setAutoStart(on) {
+  try { fs.writeFileSync(prefsFile(), JSON.stringify({ ...loadPrefs(), autoStart: !!on })); } catch (e) { /* keeps the old choice */ }
+  applyAutoStart();
+}
+function applyAutoStart() {
+  if (!app.isPackaged) return;
+  try { app.setLoginItemSettings({ openAtLogin: autoStartOn(), args: ['--hidden'] }); } catch (e) { /* not allowed on this computer: they open it themselves */ }
+}
+function startedAtLogin() {
+  if (process.argv.includes('--hidden')) return true; // Windows
+  try { return process.platform === 'darwin' && !!app.getLoginItemSettings().wasOpenedAtLogin; } catch (e) { return false; }
+}
+
 // The sign-in is kept encrypted by the operating system (Windows DPAPI / macOS Keychain), never as plain text.
 const sessionFile = () => path.join(app.getPath('userData'), 'session.bin');
 function loadSession() {
@@ -65,6 +83,7 @@ function push() {
 
 function createWindow() {
   win = new BrowserWindow({
+    show: !(tray && startedAtLogin()), // started with the computer: stays near the clock until opened
     width: 380, height: 700, resizable: false, maximizable: false, fullscreenable: false, title: 'HyreMatch Tracker', backgroundColor: '#F7F5F0',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
@@ -84,6 +103,7 @@ function createTray() {
       { label: 'Open HyreMatch Tracker', click: () => { if (win) { win.show(); win.focus(); } } },
       { label: 'Open My work (clock in / out)', click: () => shell.openExternal(SITE) },
       { type: 'separator' },
+      ...(app.isPackaged ? [{ label: 'Start with the computer', type: 'checkbox', checked: autoStartOn(), click: item => setAutoStart(item.checked) }, { type: 'separator' }] : []),
       { label: 'Quit', click: () => app.quit() },
     ]));
     tray.on('click', () => { if (win) { win.show(); win.focus(); } });
@@ -111,6 +131,7 @@ else {
   app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
   app.whenReady().then(async () => {
     loadSession();
+    applyAutoStart();
     createTray();
     createWindow();
     if (session) await engine.refresh();

@@ -60,7 +60,7 @@ function render() {
     ${s.needsScreenAccess ? `<p class="note">Screenshots need permission: System Settings › Privacy &amp; Security › Screen Recording › HyreMatch Tracker. <button class="link" id="perm">Open settings</button></p>` : ''}
     ${s.error && !s.queued && s.online !== false ? `<p class="err">${esc(s.error)}</p>` : ''}
     <button class="btn light" id="site">Open My work (clock in / out)</button>
-    <p class="small muted mt14">Keep this app open while you work. Closing the window keeps it running near the clock; choose Quit there to stop it.</p>`;
+    <p class="small muted mt14">This app starts with your computer and stays near the clock. Closing the window keeps it running; choose Quit there to stop it.</p>`;
   document.getElementById('site').onclick = () => window.tracker.open('site');
   const perm = document.getElementById('perm'); if (perm) perm.onclick = () => window.tracker.open('screen');
 }

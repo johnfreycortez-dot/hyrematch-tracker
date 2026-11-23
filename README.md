@@ -1,4 +1,4 @@
-# HyreMatch Tracker (desktop app), version 2.0.1
+# HyreMatch Tracker (desktop app), version 2.0.2
 
 A small Windows / Mac app for hired talent. While they are clocked in on hyrematch.com (My work), it counts how many
 minutes the computer is in use and how many it is idle, in 10-minute blocks, and sends them to the HyreMatch backend
@@ -16,6 +16,7 @@ minutes the computer is in use and how many it is idle, in 10-minute blocks, and
   them (client area). The HyreMatch team does not. No video.
 - Nothing is tracked until the person ticks "I accept" on the terms screen. If their client turns screen monitoring on
   later, the app asks again and tracks nothing until they accept.
+- Starts with the computer, quietly near the clock (2.0.2). The tray menu has "Start with the computer" to turn that off.
 - Works offline: time is kept (up to about 25 hours) and sent when the connection is back. The window says "Offline".
 - If the person walks away while clocked in, the time is recorded as idle (it is not hidden).
 - The sign-in (same email code as the candidate area) is stored encrypted by the operating system.
@@ -47,4 +48,3 @@ Copy the two links into the admin area: Activity > Tracker app links.
 ## Not done yet
 - The installers are not signed (see above).
 - No auto-update: a new version means sending a new installer link.
-- It does not start by itself when the computer starts: people open it before they clock in.
