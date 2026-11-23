@@ -28,12 +28,21 @@ jobs:
           sleep 20
           tasklist | grep -i "HyreMatch Tracker" || { echo "The app closed by itself"; exit 1; }
           taskkill //F //IM "HyreMatch Tracker.exe" //T || true
-      - name: Install it silently and check the files are there
-        shell: bash
+      - name: Install it silently, check the files are there, and start the installed app
+        shell: pwsh
         run: |
-          ./dist/HyreMatch-Tracker-*-win.exe //S
-          sleep 25
-          ls "$LOCALAPPDATA/Programs/HyreMatch Tracker/HyreMatch Tracker.exe"
+          $setup = (Get-Item dist\HyreMatch-Tracker-*-win.exe).FullName
+          $p = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
+          Write-Host "Installer exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+          Start-Sleep -Seconds 5
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter "HyreMatch Tracker.exe" | Select-Object -First 1
+          if (-not $exe) { Write-Host "The app was not installed"; exit 1 }
+          Write-Host "Installed at $($exe.FullName)"
+          Start-Process -FilePath $exe.FullName
+          Start-Sleep -Seconds 20
+          if (-not (Get-Process -Name "HyreMatch Tracker" -ErrorAction SilentlyContinue)) { Write-Host "The installed app closed by itself"; exit 1 }
+          Stop-Process -Name "HyreMatch Tracker" -Force
       - uses: actions/upload-artifact@v4
         with:
           name: installer-windows
