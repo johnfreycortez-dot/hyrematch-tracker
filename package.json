@@ -1,0 +1,50 @@
+{
+  "name": "hyrematch-tracker",
+  "productName": "HyreMatch Tracker",
+  "version": "2.0.0",
+  "description": "Counts active and idle time while you are clocked in at HyreMatch.",
+  "author": "HyreMatch Inc.",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/engine.test.js",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.hyrematch.tracker",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**",
+      "renderer/**"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "HyreMatch Tracker takes a screenshot of your screens about every 10 minutes while you are clocked in, only when your client uses screen monitoring."
+      },
+      "icon": "build/icon.png"
+    },
+    "artifactName": "HyreMatch-Tracker-${version}-${os}.${ext}"
+  }
+}
